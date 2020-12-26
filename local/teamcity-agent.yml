@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: teamcity-agent
+  labels:
+    instance: teamcity-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      instance: teamcity-agent
+  template:
+    metadata:
+      name: teamcity-agent
+      labels:
+        instance: teamcity-agent
+    spec:
+      hostAliases:
+        - ip: 192.168.0.103
+          hostnames:
+            - "denveru1"
+            - "solacevmr"
+            - "pgsql"
+            - "zk"
+      containers:
+        - name: teamcity-agent
+          image: jetbrains/teamcity-agent:2019.2.2
+          env:
+            - name: AGENT_NAME
+              value: "UbuntuA"
+            - name: SERVER_URL
+              value: "teamcity-server:8111"
+            - name: HOST_OS_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: DOCKER_HOST
+              value: tcp://$(HOST_OS_IP):2375
+          volumeMounts:
+            - name: conf
+              mountPath: /data/teamcity_agent/conf
+              readOnly: false
+            - name: work
+              mountPath: /opt/buildagent/work
+              readOnly: false
+            - name: system
+              mountPath: /opt/buildagent/system
+              readOnly: false
+            - name: ext
+              mountPath: /opt/buildagent/ext
+              readOnly: false
+      initContainers:
+        - name: teamcity-agent-init
+          image: gcr.io/kubernetes-e2e-test-images/dnsutils:1.3
+          command: ["/bin/sh"]
+          args: ["-c", "sleep 60; until nc -v -z -w 3 teamcity-server 8111; do echo 'Waiting for TeamCity Server ...'; sleep 3; done"]
+      volumes:
+        - name: conf
+          hostPath:
+            path: "/opt/volumes/teamcity-agent/conf"
+        - name: work
+          hostPath:
+            path: "/opt/volumes/teamcity-agent/work"
+        - name: system
+          hostPath:
+            path: "/opt/volumes/teamcity-agent/system"
+        - name: ext
+          hostPath:
+            path: "/opt/volumes/teamcity-agent/ext"
