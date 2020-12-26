@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nexus
+  labels:
+    instance: nexus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      instance: nexus
+  template:
+    metadata:
+      name: nexus
+      labels:
+        instance: nexus
+    spec:
+      containers:
+        - name: nexus
+          image: sonatype/nexus3:3.22.0
+          resources:
+            limits:
+              cpu: "1"
+          ports:
+            - containerPort: 8081
+            - containerPort: 8082
+            - containerPort: 8083
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 300
+            periodSeconds: 60
+            successThreshold: 1
+            failureThreshold: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 300
+            periodSeconds: 60
+            successThreshold: 1
+            failureThreshold: 10
+          volumeMounts:
+            - name: data
+              mountPath: /nexus-data
+              readOnly: false
+            - name: work
+              mountPath: /opt/sonatype/sonatype-work
+              readOnly: false
+      initContainers:
+        - name: nexus-init
+          image: gcr.io/kubernetes-e2e-test-images/dnsutils:1.3
+          command: ["/bin/sh"]
+          args: ["-c", "sleep 60; until nc -v -z -w 3 solace 55555; do echo 'Waiting for Solace ...'; sleep 3; done"]
+      volumes:
+        - name: data
+          hostPath:
+            # sudo chown -R 200:200 /opt/volumes/nexus
+            # nexus user id = 200
+            path: /opt/volumes/nexus/data
+        - name: work
+          hostPath:
+            path: /opt/volumes/nexus/work
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexus
+spec:
+  selector:
+    instance: nexus
+  ports:
+    - name: http-maven
+      port: 8081
+      nodePort: 30081
+    - name: http-docker-public
+      port: 8082
+      nodePort: 30082
+    - name: http-docker-local
+      port: 8083
+      nodePort: 30083
+  type: NodePort

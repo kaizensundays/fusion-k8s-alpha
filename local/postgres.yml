@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: postgres
+  labels:
+    instance: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      instance: postgres
+  template:
+    metadata:
+      name: postgres
+      labels:
+        instance: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:9.6.17
+          env:
+            - name: POSTGRES_PASSWORD
+              value: "postgres"
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 300
+            periodSeconds: 60
+            successThreshold: 1
+            failureThreshold: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 300
+            periodSeconds: 60
+            successThreshold: 1
+            failureThreshold: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              readOnly: false
+      volumes:
+        - name: data
+          hostPath:
+            path: "/opt/volumes/postgres/data"
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 300
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    instance: postgres
+  ports:
+    - name: http
+      port: 5432
+      nodePort: 30432
+  type: NodePort
