@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kafka
+  labels:
+    tag: kafka
+spec:
+  containers:
+    - name: kafka
+      image: bitnami/kafka:2.7.0
+      ports:
+        - name: broker
+          containerPort: 9092
+        - name: jmx
+          containerPort: 5551
+      env:
+        - name: HOST_OS_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: KAFKA_CFG_ZOOKEEPER_CONNECT
+          value: "$(HOST_OS_IP):30181"
+        - name: KAFKA_CFG_LISTENERS
+          value: "PLAINTEXT://0.0.0.0:9092"
+        - name: KAFKA_CFG_ADVERTISED_LISTENERS
+          value: "PLAINTEXT://$(HOST_OS_IP):30992"
+        - name: KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE
+          value: "true"
+        - name: ALLOW_PLAINTEXT_LISTENER
+          value: "yes"
+        - name: JMX_PORT
+          value: "5551"
+  restartPolicy: Never
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+spec:
+  selector:
+    tag: kafka
+  ports:
+    - name: broker
+      port: 9092
+      nodePort: 30992
+    - name: jmx
+      port: 5551
+      nodePort: 30551
+  type: NodePort
